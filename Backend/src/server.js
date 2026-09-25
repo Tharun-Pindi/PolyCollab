@@ -857,6 +857,20 @@ app.post('/api/auth/verify-reset-password', async (req, res) => {
   }
 });
 
+app.get('/api/ping', async (req, res) => {
+  try {
+    const { error } = await supabaseAdmin.from('keep_alive_logs').insert([{ source: 'cron-job.org' }]);
+    if (error) {
+      console.error('Ping error:', error);
+      return res.status(500).json({ success: false, error: error.message });
+    }
+    console.log('⚡ Ping received and logged to Supabase to keep it awake!');
+    res.json({ success: true, message: 'Database kept awake 🚀' });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 app.get('/', (req, res) => {
   res.send('PolyCollab Backend is running 🚀');
 });
