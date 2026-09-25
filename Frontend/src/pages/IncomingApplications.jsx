@@ -42,9 +42,7 @@ export default function IncomingApplications() {
     setApps(prev => prev.map(a => a.id === id ? { ...a, status: newStatus } : a));
 
     // In a full implementation, you would send a PATCH request here:
-    // await fetch(`${import.meta.env.VITE_BACKEND_API_URL}/api/applications/${id}`
-, { method: 'PATCH', body: JSON.stringify({ status: newStatus })
-});
+    // await fetch(`${import.meta.env.VITE_BACKEND_API_URL}/api/applications/${id}`, { method: 'PATCH', body: JSON.stringify({ status: newStatus }) });
   };
 
 return (
