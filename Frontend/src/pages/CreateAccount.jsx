@@ -65,11 +65,12 @@ export default function CreateAccount() {
 
     try {
       // 1. Dispatch real email OTP via Express Backend (Resend API)
-      const res = await fetch('http://localhost:5000/api/auth/send-signup-otp', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: formData.email, password: formData.password })
-      });
+      const res = await fetch(`${import.meta.env.VITE_BACKEND_API_URL}/api/auth/send-signup-otp`
+        , {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: formData.email, password: formData.password })
+        });
 
       const resData = await res.json();
       if (resData.success && resData.message) {
@@ -89,7 +90,7 @@ export default function CreateAccount() {
       await supabase.auth.signInWithOtp({
         email: formData.email,
         options: { shouldCreateUser: true }
-      }).catch(() => {});
+      }).catch(() => { });
       setInfoMsg(`Verification code sent to ${formData.email}. Please check your email inbox and spam folder.`);
     }
 
@@ -111,11 +112,12 @@ export default function CreateAccount() {
 
     try {
       // 1. Verify OTP code via Express Backend (Resend OTP Store)
-      const res = await fetch('http://localhost:5000/api/auth/verify-signup-otp', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: formData.email, otp: otp.trim() })
-      });
+      const res = await fetch(`${import.meta.env.VITE_BACKEND_API_URL}/api/auth/verify-signup-otp`
+        , {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: formData.email, otp: otp.trim() })
+        });
 
       const resData = await res.json();
       if (resData.success && resData.user) {
@@ -274,15 +276,14 @@ export default function CreateAccount() {
                     <div key={barIndex} className="h-1 flex-1 bg-surface-variant rounded-full overflow-hidden">
                       {strengthLevel >= barIndex && (
                         <div
-                          className={`h-full transition-all duration-300 ${
-                            strengthLevel === 1
+                          className={`h-full transition-all duration-300 ${strengthLevel === 1
                               ? 'bg-error w-full'
                               : strengthLevel === 2
-                              ? 'bg-amber-500 w-full'
-                              : strengthLevel === 3
-                              ? 'bg-blue-500 w-full'
-                              : 'bg-green-500 w-full'
-                          }`}
+                                ? 'bg-amber-500 w-full'
+                                : strengthLevel === 3
+                                  ? 'bg-blue-500 w-full'
+                                  : 'bg-green-500 w-full'
+                            }`}
                         ></div>
                       )}
                     </div>

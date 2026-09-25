@@ -130,7 +130,7 @@ export default function HelpSupport() {
     window.addEventListener('polycollab_state_change', handleStorageChange);
     return () => window.removeEventListener('polycollab_state_change', handleStorageChange);
   }, []);
-  
+
   const currentUser = getUserProfile();
   const currentUserEmail = currentUser.primaryEmail;
 
@@ -171,23 +171,24 @@ export default function HelpSupport() {
       try {
         const { data: { user } } = await supabase.auth.getUser();
         if (user?.email) realEmail = user.email;
-      } catch (err) {}
+      } catch (err) { }
 
       // Send real email alert by hitting backend
       try {
-        await fetch('http://localhost:5000/api/tickets', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            subject: ticketForm.subject,
-            category: ticketForm.category,
-            priority: ticketForm.priority,
-            description: ticketForm.description,
-            attachmentName: ticketForm.attachmentName,
-            userEmail: realEmail,
-            userName: currentUser.fullName || 'Builder'
-          })
-        });
+        await fetch(`${import.meta.env.VITE_BACKEND_API_URL}/api/tickets`
+          , {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              subject: ticketForm.subject,
+              category: ticketForm.category,
+              priority: ticketForm.priority,
+              description: ticketForm.description,
+              attachmentName: ticketForm.attachmentName,
+              userEmail: realEmail,
+              userName: currentUser.fullName || 'Builder'
+            })
+          });
       } catch (err) {
         console.error('Error submitting support ticket to backend:', err);
       }
@@ -648,9 +649,8 @@ export default function HelpSupport() {
                     <span className="text-xs px-2 py-0.5 rounded-full bg-surface-container text-on-surface font-medium">
                       {ticket.category}
                     </span>
-                    <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${
-                      ticket.status === 'Open' ? 'bg-blue-500/10 text-blue-600' : 'bg-emerald-500/10 text-emerald-600'
-                    }`}>
+                    <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${ticket.status === 'Open' ? 'bg-blue-500/10 text-blue-600' : 'bg-emerald-500/10 text-emerald-600'
+                      }`}>
                       {ticket.status}
                     </span>
                   </div>

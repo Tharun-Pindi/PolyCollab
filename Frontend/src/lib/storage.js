@@ -115,7 +115,8 @@ export const deleteUserAccount = async () => {
     const { data: { session } } = await supabase.auth.getSession();
     const userId = session?.user?.id || profile.id;
     if (userId) {
-      await fetch(`http://localhost:5000/api/users/${userId}`, { method: 'DELETE' });
+      await fetch(`${import.meta.env.VITE_BACKEND_API_URL}/api/users/${userId}`
+        , { method: 'DELETE' });
     }
   } catch (err) {
     console.warn('Account delete notice:', err.message);
@@ -371,11 +372,12 @@ export const saveUserProfile = async (profileData, syncToDb = true) => {
     };
 
     try {
-      const res = await fetch('http://localhost:5000/api/profiles', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      });
+      const res = await fetch(`${import.meta.env.VITE_BACKEND_API_URL}/api/profiles`
+        , {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
       const data = await res.json();
       if (!data.success) {
         console.warn('Backend profile sync notice:', data.error);
@@ -456,11 +458,11 @@ export const DEFAULT_TICKETS = [];
 export const getSupportTickets = (userEmail) => {
   const list = getStoredData('tickets_list', DEFAULT_TICKETS);
   const cleanList = list.filter((t) => t.id !== 'TICKET-5983' && t.id !== 'TICKET-9281');
-  
+
   if (!userEmail || !userEmail.trim()) return [];
-  
+
   const targetEmail = userEmail.trim().toLowerCase();
-  
+
   // Strictly filter tickets matching ONLY this user's email address
   return cleanList.filter((t) => t.userEmail && t.userEmail.trim().toLowerCase() === targetEmail);
 };
@@ -524,7 +526,7 @@ export const addUserDraft = (draft) => {
 };
 
 export const getDeletedProjectIdentifiers = () => new Set();
-export const markProjectAsDeleted = () => {};
+export const markProjectAsDeleted = () => { };
 export const isProjectDeleted = () => false;
 
 export const getUserCreatedProjects = () => {
@@ -621,18 +623,19 @@ export const addUserCreatedProject = async (project) => {
       };
 
       try {
-        const res = await fetch('http://localhost:5000/api/projects', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload)
-        });
+        const res = await fetch(`${import.meta.env.VITE_BACKEND_API_URL}/api/projects`
+          , {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+          });
         if (!res.ok) throw new Error('Failed to create project');
         const json = await res.json();
         console.log('✅ Project synced successfully!', json.data);
       } catch (err) {
         console.error('❌ Backend projects insert error:', err.message);
       }
-      
+
       // Force a fresh sync from the database
       await fetchProjectsFromSupabase();
     } catch (err) {
@@ -646,7 +649,8 @@ export const addUserCreatedProject = async (project) => {
 export const deleteUserCreatedProject = async (projectId, projectTitle) => {
   try {
     if (projectId) {
-      const res = await fetch(`http://localhost:5000/api/projects/${projectId}`, { method: 'DELETE' });
+      const res = await fetch(`${import.meta.env.VITE_BACKEND_API_URL}/api/projects/${projectId}`
+        , { method: 'DELETE' });
       if (!res.ok) throw new Error('Failed to delete project');
     } else if (projectTitle) {
       // Deleting by title via API not implemented, but we can try Supabase as fallback
@@ -666,11 +670,12 @@ export const deleteUserCreatedProject = async (projectId, projectTitle) => {
 export const fetchProjectsFromSupabase = async () => {
   const deletedSet = getDeletedProjectIdentifiers();
   let dbProjects = [];
-  
+
   // 1. Direct Supabase client query
   if (!dbProjects || dbProjects.length === 0) {
     try {
-      const res = await fetch('http://localhost:5000/api/projects');
+      const res = await fetch(`${import.meta.env.VITE_BACKEND_API_URL}/api/projects`
+      );
       if (res.ok) {
         const json = await res.json();
         dbProjects = json.data || [];
@@ -681,61 +686,61 @@ export const fetchProjectsFromSupabase = async () => {
   }
 
   if (dbProjects && Array.isArray(dbProjects)) {
-      const formattedList = dbProjects
-        .map((p) => {
-          const rawOverview = (p.description || p.overview || '').trim();
-          const rawShort = (p.shortDesc || (rawOverview.length > 160 ? rawOverview.slice(0, 150) + '...' : rawOverview)).trim();
+    const formattedList = dbProjects
+      .map((p) => {
+        const rawOverview = (p.description || p.overview || '').trim();
+        const rawShort = (p.shortDesc || (rawOverview.length > 160 ? rawOverview.slice(0, 150) + '...' : rawOverview)).trim();
 
-          const creatorName = p.creator_name || p.profiles?.full_name || 'Project Owner';
-          const creatorAvatar = p.creator_avatar || getUserAvatar({ avatar: p.profiles?.avatar_url }) || INSTAGRAM_EMPTY_AVATAR;
+        const creatorName = p.creator_name || p.profiles?.full_name || 'Project Owner';
+        const creatorAvatar = p.creator_avatar || getUserAvatar({ avatar: p.profiles?.avatar_url }) || INSTAGRAM_EMPTY_AVATAR;
 
-          const rolesList = (p.project_roles && p.project_roles.length > 0)
-            ? p.project_roles
-            : (p.roles && Array.isArray(p.roles) ? p.roles : []);
+        const rolesList = (p.project_roles && p.project_roles.length > 0)
+          ? p.project_roles
+          : (p.roles && Array.isArray(p.roles) ? p.roles : []);
 
-          const rolesSum = Array.isArray(rolesList) ? rolesList.reduce((acc, r) => acc + (parseInt(r.openings, 10) || 1), 0) : 0;
-          const capacityNum = p.team_capacity || (rolesSum > 0 ? rolesSum : 5);
-          const capacityStr = `${capacityNum} Builders`;
+        const rolesSum = Array.isArray(rolesList) ? rolesList.reduce((acc, r) => acc + (parseInt(r.openings, 10) || 1), 0) : 0;
+        const capacityNum = p.team_capacity || (rolesSum > 0 ? rolesSum : 5);
+        const capacityStr = `${capacityNum} Builders`;
 
-          return {
-            id: p.id,
-            ownerId: p.owner_id,
-            initials: p.title ? p.title.slice(0, 2).toUpperCase() : 'PR',
-            title: p.title,
-            shortDesc: rawShort || 'No short summary provided.',
-            desc: rawShort || 'No short summary provided.',
-            category: p.category || 'Web Application',
-            tags: Array.isArray(p.tech_stack) ? p.tech_stack : (typeof p.tech_stack === 'string' ? p.tech_stack.split(',') : [p.category || 'App']),
-            tech: Array.isArray(p.tech_stack) ? p.tech_stack.join(', ') : (typeof p.tech_stack === 'string' ? p.tech_stack : 'React, Node.js'),
-            teamSize: capacityStr,
-            builders: capacityStr,
-            level: p.level || 'Intermediate',
-            role: rolesList.length > 0 ? rolesList[0].title : 'Contributor',
-            status: p.status || 'Open',
-            roles: rolesList,
-            stage: p.stage || 'In Development',
-            goal: p.goal || '',
-            duration: p.duration || '',
-            commitment: p.commitment || '',
-            communication: p.communication || '',
-            visibility: p.visibility || 'Public',
-            refLink: p.ref_link || '',
-            overview: rawOverview || 'No detailed overview provided.',
-            creatorEmail: p.profiles?.primary_email || '',
-            creatorName,
-            creatorAvatar,
-            creatorBio: p.profiles?.bio || '',
-            creatorRole: p.profiles?.title || '',
-            creatorLocation: p.profiles?.location || '',
-            creatorGithub: p.profiles?.github_url || '',
-            creatorWebsite: p.profiles?.website_url || '',
-            postedTime: 'Posted recently'
-          };
-        });
+        return {
+          id: p.id,
+          ownerId: p.owner_id,
+          initials: p.title ? p.title.slice(0, 2).toUpperCase() : 'PR',
+          title: p.title,
+          shortDesc: rawShort || 'No short summary provided.',
+          desc: rawShort || 'No short summary provided.',
+          category: p.category || 'Web Application',
+          tags: Array.isArray(p.tech_stack) ? p.tech_stack : (typeof p.tech_stack === 'string' ? p.tech_stack.split(',') : [p.category || 'App']),
+          tech: Array.isArray(p.tech_stack) ? p.tech_stack.join(', ') : (typeof p.tech_stack === 'string' ? p.tech_stack : 'React, Node.js'),
+          teamSize: capacityStr,
+          builders: capacityStr,
+          level: p.level || 'Intermediate',
+          role: rolesList.length > 0 ? rolesList[0].title : 'Contributor',
+          status: p.status || 'Open',
+          roles: rolesList,
+          stage: p.stage || 'In Development',
+          goal: p.goal || '',
+          duration: p.duration || '',
+          commitment: p.commitment || '',
+          communication: p.communication || '',
+          visibility: p.visibility || 'Public',
+          refLink: p.ref_link || '',
+          overview: rawOverview || 'No detailed overview provided.',
+          creatorEmail: p.profiles?.primary_email || '',
+          creatorName,
+          creatorAvatar,
+          creatorBio: p.profiles?.bio || '',
+          creatorRole: p.profiles?.title || '',
+          creatorLocation: p.profiles?.location || '',
+          creatorGithub: p.profiles?.github_url || '',
+          creatorWebsite: p.profiles?.website_url || '',
+          postedTime: 'Posted recently'
+        };
+      });
 
-      setStoredData('all_published_projects', formattedList);
-      return formattedList;
-    }
+    setStoredData('all_published_projects', formattedList);
+    return formattedList;
+  }
 
   return [];
 };
@@ -784,7 +789,8 @@ export const fetchRegisteredBuildersFromSupabase = async () => {
   // 1. Direct Supabase client query
   if (!dbProfiles || dbProfiles.length === 0) {
     try {
-      const res = await fetch('http://localhost:5000/api/profiles');
+      const res = await fetch(`${import.meta.env.VITE_BACKEND_API_URL}/api/profiles`
+      );
       if (res.ok) {
         const json = await res.json();
         dbProfiles = json.data || [];
@@ -808,7 +814,7 @@ export const fetchRegisteredBuildersFromSupabase = async () => {
       const languages = (p.profile_tech_stacks || []).filter(s => s.category === 'languages').map(s => s.skill_name);
       const frontend = (p.profile_tech_stacks || []).filter(s => s.category === 'frontend').map(s => s.skill_name);
       const backend = (p.profile_tech_stacks || []).filter(s => s.category === 'backend').map(s => s.skill_name);
-      
+
       // Map Roles (Experiences)
       const mappedRoles = (p.profile_experiences || []).map(r => ({
         id: r.id,

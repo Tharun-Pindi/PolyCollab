@@ -44,14 +44,15 @@ export const uploadImageToCloudinary = async (imageData, folder = 'polycollab_up
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 12000); // 12 sec timeout limit
 
-    const res = await fetch('http://localhost:5000/api/upload', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({ image: compressedImage, folder }),
-      signal: controller.signal
-    });
+    const res = await fetch(`${import.meta.env.VITE_BACKEND_API_URL}/api/upload`
+      , {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ image: compressedImage, folder }),
+        signal: controller.signal
+      });
 
     clearTimeout(timeoutId);
     const data = await res.json();

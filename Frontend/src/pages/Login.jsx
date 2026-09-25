@@ -40,11 +40,12 @@ export default function Login() {
     if (!authError && authData?.user) {
       let dbProfile = null;
       try {
-        const res = await fetch('http://localhost:5000/api/auth/login', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email: cleanEmail, password })
-        });
+        const res = await fetch(`${import.meta.env.VITE_BACKEND_API_URL}/api/auth/login`
+          , {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email: cleanEmail, password })
+          });
         if (res.ok) {
           const json = await res.json();
           if (json.success && json.profile) {

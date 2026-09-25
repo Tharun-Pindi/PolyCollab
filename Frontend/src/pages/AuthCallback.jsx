@@ -42,7 +42,8 @@ export default function AuthCallback() {
 
     // 1. Try Express Backend API
     try {
-      const res = await fetch('http://localhost:5000/api/profiles');
+      const res = await fetch(`${import.meta.env.VITE_BACKEND_API_URL}/api/profiles`
+      );
       const resData = await res.json();
       if (resData.success && Array.isArray(resData.data)) {
         dbProfile = resData.data.find((p) => p.id === user.id);
@@ -71,11 +72,11 @@ export default function AuthCallback() {
 
     // Check if profile exists and has required fields complete
     const hasCompleteProfile = Boolean(
-      dbProfile && 
-      dbProfile.full_name && 
-      dbProfile.full_name.trim().length > 0 && 
+      dbProfile &&
+      dbProfile.full_name &&
+      dbProfile.full_name.trim().length > 0 &&
       dbProfile.title &&
-      dbProfile.bio && 
+      dbProfile.bio &&
       dbProfile.bio.trim().length > 0
     );
 
@@ -88,17 +89,18 @@ export default function AuthCallback() {
       if (!hasCompleteProfile || isBrandNewAuthUser) {
         // Strict Block: User is trying to login but they are either completely new or don't have a complete profile.
         console.warn('Unauthorized login attempt by unregistered user. Blocking and cleaning up ghost accounts.');
-        
+
         // 1. Ensure they are deleted from Supabase Auth and any partial DB profiles
         try {
-          await fetch(`http://localhost:5000/api/users/${user.id}`, { method: 'DELETE' });
+          await fetch(`${import.meta.env.VITE_BACKEND_API_URL}/api/users/${user.id}`
+            , { method: 'DELETE' });
         } catch (e) {
           console.warn('Could not delete unauthorized user:', e);
         }
 
         // 2. Sign out of the ghost session
         await supabase.auth.signOut();
-        
+
         // 3. Clear local storage traces
         Object.keys(localStorage).forEach((key) => {
           if (key.startsWith('polycollab_')) localStorage.removeItem(key);
@@ -114,7 +116,7 @@ export default function AuthCallback() {
       console.warn('Signup attempt by already registered user. Blocking.');
       try {
         await supabase.auth.signOut();
-      } catch (e) {}
+      } catch (e) { }
       Object.keys(localStorage).forEach((key) => {
         if (key.startsWith('polycollab_') && key !== 'polycollab_github_auth_source') {
           localStorage.removeItem(key);

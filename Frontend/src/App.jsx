@@ -35,7 +35,7 @@ function ProtectedLayout({ session, loading }) {
 
   useEffect(() => {
     let isMounted = true;
-    
+
     const verifyRealDbProfile = async () => {
       if (!session?.user) {
         if (isMounted) setDbSyncing(false);
@@ -56,7 +56,7 @@ function ProtectedLayout({ session, loading }) {
 
         // Must have a profile and must have completed the wizard (full_name and title)
         let isValid = Boolean(data && data.full_name && data.full_name.trim().length > 0 && data.title);
-        
+
         // BULLETPROOF FALLBACK: If DB check fails or lags, trust the local storage if they just completed the wizard
         if (!isValid) {
           const localProfile = getUserProfile();
@@ -75,7 +75,7 @@ function ProtectedLayout({ session, loading }) {
         // Fallback on error too
         const localProfile = getUserProfile();
         const isValid = Boolean(localProfile && localProfile.fullName && localProfile.title);
-        
+
         if (isMounted) {
           setHasValidProfile(isValid);
           setDbSyncing(false);
@@ -110,24 +110,25 @@ function ProtectedLayout({ session, loading }) {
   // REAL DB SYNC: Block unauthorized access to the dashboard
   if (!hasValidProfile) {
     // Check if we explicitly know they clicked the Login button
-    const authSource = localStorage.getItem('polycollab_github_auth_source') || 
-                       document.cookie.match(/(^| )polycollab_github_auth_source=([^;]+)/)?.[2];
-                       
+    const authSource = localStorage.getItem('polycollab_github_auth_source') ||
+      document.cookie.match(/(^| )polycollab_github_auth_source=([^;]+)/)?.[2];
+
     if (authSource === 'login') {
       // They clicked Login but don't have a profile. This is an unauthorized login attempt!
       // Delete the ghost auth user and kick them back to login.
       try {
-        fetch(`http://localhost:5000/api/users/${session.user.id}`, { method: 'DELETE' }).catch(() => {});
-      } catch(e) {}
-      
-      supabase.auth.signOut().catch(()=> { /* ignore */ });
-      
+        fetch(`${import.meta.env.VITE_BACKEND_API_URL}/api/users/${session.user.id}`
+          , { method: 'DELETE' }).catch(() => { });
+      } catch (e) { }
+
+      supabase.auth.signOut().catch(() => { /* ignore */ });
+
       Object.keys(localStorage).forEach((key) => {
         if (key.startsWith('polycollab_')) {
           localStorage.removeItem(key);
         }
       });
-  
+
       localStorage.setItem('auth_error', "No matching account found. If you registered via email, please login with email/password instead.");
       return <Navigate to="/login" replace />;
     }

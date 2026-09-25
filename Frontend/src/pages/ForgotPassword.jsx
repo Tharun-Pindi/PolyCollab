@@ -7,7 +7,7 @@ export default function ForgotPassword() {
   const [email, setEmail] = useState('');
   const [otp, setOtp] = useState('');
   const [newPassword, setNewPassword] = useState('');
-  
+
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState(null);
   const [errorMsg, setErrorMsg] = useState(null);
@@ -19,11 +19,12 @@ export default function ForgotPassword() {
     setErrorMsg(null);
 
     try {
-      const res = await fetch('http://localhost:5000/api/auth/forgot-password', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email })
-      });
+      const res = await fetch(`${import.meta.env.VITE_BACKEND_API_URL}/api/auth/forgot-password`
+        , {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email })
+        });
       const data = await res.json();
 
       if (!data.success) {
@@ -45,17 +46,18 @@ export default function ForgotPassword() {
       setErrorMsg('Password must be at least 12 characters.');
       return;
     }
-    
+
     setLoading(true);
     setMessage(null);
     setErrorMsg(null);
 
     try {
-      const res = await fetch('http://localhost:5000/api/auth/verify-reset-password', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, otp, newPassword })
-      });
+      const res = await fetch(`${import.meta.env.VITE_BACKEND_API_URL}/api/auth/verify-reset-password`
+        , {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, otp, newPassword })
+        });
       const data = await res.json();
 
       if (!data.success) {
@@ -86,7 +88,7 @@ export default function ForgotPassword() {
             {step === 1 ? 'Reset Password' : 'Enter Reset Code'}
           </h1>
           <p className="font-body-md text-body-md text-on-surface-variant">
-            {step === 1 
+            {step === 1
               ? "Enter your email and we'll send you a 6-digit code."
               : `We sent a 6-digit code to ${email}`
             }
@@ -153,7 +155,7 @@ export default function ForgotPassword() {
                 placeholder="000000"
               />
             </div>
-            
+
             <div>
               <label className="block font-label-md text-label-md text-on-surface mb-xs" htmlFor="newPassword">
                 New Password
@@ -177,9 +179,9 @@ export default function ForgotPassword() {
               {loading ? 'Verifying...' : 'Reset Password'}
             </button>
             <div className="text-center pt-2">
-               <button type="button" onClick={() => setStep(1)} className="text-sm font-medium text-primary hover:underline cursor-pointer">
-                 Back to email input
-               </button>
+              <button type="button" onClick={() => setStep(1)} className="text-sm font-medium text-primary hover:underline cursor-pointer">
+                Back to email input
+              </button>
             </div>
           </form>
         )}

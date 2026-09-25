@@ -51,24 +51,25 @@ export default function ApplyToProject() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
+
     const currentUser = getUserProfile();
     if (project?.id && currentUser?.id) {
       try {
-        await fetch('http://localhost:5000/api/applications', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            project_id: project.id,
-            applicant_id: currentUser.id,
-            role_applied: projectRole,
-            why_join: whyJoin,
-            experience: experience,
-            links: links.filter(l => l.trim() !== ''),
-            comm_pref: commPref,
-            comm_handle: commHandle
-          })
-        });
+        await fetch(`${import.meta.env.VITE_BACKEND_API_URL}/api/applications`
+          , {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              project_id: project.id,
+              applicant_id: currentUser.id,
+              role_applied: projectRole,
+              why_join: whyJoin,
+              experience: experience,
+              links: links.filter(l => l.trim() !== ''),
+              comm_pref: commPref,
+              comm_handle: commHandle
+            })
+          });
       } catch (err) {
         console.warn('Backend application submit notice:', err.message);
       }
