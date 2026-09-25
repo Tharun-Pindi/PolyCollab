@@ -1,0 +1,23 @@
+{
+  "name": "polycollab-backend",
+  "version": "1.0.0",
+  "description": "Node.js & Express.js Backend API for PolyCollab with Supabase",
+  "main": "src/server.js",
+  "type": "module",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "nodemon src/server.js"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.39.0",
+    "cloudinary": "^2.11.0",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.18.2",
+    "nodemailer": "^10.0.7",
+    "resend": "^6.26.0"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.3"
+  }
+}

@@ -1,0 +1,119 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body {
+  font-family: 'DM Sans', 'Poppins', 'Anek Telugu', sans-serif;
+  background-color: #F8FAFC;
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+/* Ensure Telugu typography uses bold, crisp, thick Anek Telugu font */
+:lang(te), [data-lang="Telugu"] {
+  font-family: 'Anek Telugu', 'DM Sans', sans-serif;
+  font-weight: 600;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Telugu text elements default to extra bold weight for clarity (excluding icon elements) */
+[data-lang="Telugu"] h1:not(.material-symbols-outlined),
+[data-lang="Telugu"] h2:not(.material-symbols-outlined),
+[data-lang="Telugu"] h3:not(.material-symbols-outlined),
+[data-lang="Telugu"] h4:not(.material-symbols-outlined),
+[data-lang="Telugu"] h5:not(.material-symbols-outlined),
+[data-lang="Telugu"] h6:not(.material-symbols-outlined),
+[data-lang="Telugu"] button:not(.material-symbols-outlined),
+[data-lang="Telugu"] label:not(.material-symbols-outlined),
+[data-lang="Telugu"] span:not(.material-symbols-outlined),
+[data-lang="Telugu"] p:not(.material-symbols-outlined),
+[data-lang="Telugu"] a:not(.material-symbols-outlined) {
+  font-weight: 700;
+}
+
+/* Material Symbols Outlined Icon Font Protection */
+.material-symbols-outlined {
+  font-family: 'Material Symbols Outlined' !important;
+  font-weight: normal !important;
+  font-style: normal !important;
+  font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+}
+
+/* ========================================================
+   GLOBAL DARK MODE OVERRIDES (Converts Entire Website)
+   ======================================================== */
+html.dark {
+  color-scheme: dark;
+}
+
+html.dark body {
+  background-color: #0b0f19 !important;
+  color: #f1f5f9 !important;
+}
+
+html.dark div,
+html.dark main,
+html.dark section,
+html.dark article,
+html.dark header,
+html.dark aside,
+html.dark nav {
+  border-color: #1e293b;
+}
+
+html.dark .bg-background,
+html.dark .bg-surface,
+html.dark .bg-surface-bright {
+  background-color: #0b0f19 !important;
+  color: #f1f5f9 !important;
+}
+
+html.dark .bg-surface-container-lowest {
+  background-color: #151c2c !important;
+  color: #f1f5f9 !important;
+  border-color: #1e293b !important;
+}
+
+html.dark .bg-surface-container-low,
+html.dark .bg-surface-container,
+html.dark .bg-surface-container-high,
+html.dark .bg-surface-container-highest {
+  background-color: #1e293b !important;
+  color: #f1f5f9 !important;
+  border-color: #334155 !important;
+}
+
+html.dark .bg-surface-variant {
+  background-color: #1e293b !important;
+  color: #cbd5e1 !important;
+}
+
+html.dark .text-on-surface {
+  color: #f8fafc !important;
+}
+
+html.dark .text-on-surface-variant {
+  color: #94a3b8 !important;
+}
+
+html.dark .border-outline-variant,
+html.dark .border-outline {
+  border-color: #27354a !important;
+}
+
+html.dark input:not([type="checkbox"]):not([type="radio"]),
+html.dark select,
+html.dark textarea {
+  background-color: #111827 !important;
+  color: #f8fafc !important;
+  border-color: #374151 !important;
+}
+
+html.dark header {
+  background-color: #0f172a !important;
+  border-color: #1e293b !important;
+}
+
+html.dark aside {
+  background-color: #0f172a !important;
+  border-color: #1e293b !important;
+}
