@@ -42,9 +42,9 @@ app.post('/api/auth/send-signup-otp', async (req, res) => {
         .select('*')
         .eq('primary_email', cleanEmail)
         .maybeSingle();
-      
+
       const hasCompleteProfile = Boolean(dbProfile && dbProfile.full_name && dbProfile.full_name.trim().length > 0 && dbProfile.title);
-      
+
       if (hasCompleteProfile) {
         return res.status(400).json({ success: false, error: 'Account already exists. Please login instead.' });
       }
@@ -410,13 +410,13 @@ app.post('/api/profiles', async (req, res) => {
       skills,
       ...baseProfile
     } = req.body;
-    
+
     // Sanitize ID to ensure it is a valid UUID or undefined so Postgres UUID type doesn't throw 22P02 syntax error
     const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
     if (baseProfile.id && !uuidRegex.test(baseProfile.id)) {
       delete baseProfile.id;
     }
-    
+
     // 1. Check for orphaned profiles to prevent UNIQUE constraint violations on primary_email
     if (baseProfile.primary_email && baseProfile.id) {
       const { data: existingProfile } = await supabaseAdmin
@@ -436,13 +436,13 @@ app.post('/api/profiles', async (req, res) => {
     if (!baseProfile.id) {
       upsertOptions = { onConflict: 'primary_email' };
     }
-    
+
     const { data: profileData, error: profileErr } = await supabaseAdmin
       .from('profiles')
       .upsert(baseProfile, upsertOptions)
       .select()
       .single();
-      
+
     if (profileErr) {
       console.error('❌ Supabase upsert error in /api/profiles:', profileErr);
       throw profileErr;
@@ -522,7 +522,7 @@ app.post('/api/applications', async (req, res) => {
       comm_pref: comm_pref || null,
       comm_handle: comm_handle || null
     }).select().single();
-    
+
     if (error) throw error;
     res.json({ success: true, data });
   } catch (err) {
@@ -589,12 +589,12 @@ app.delete('/api/users/:id', async (req, res) => {
 
     console.log(`🧹 Attempting to clean up ghost auth user: ${userId}`);
     const { error } = await supabaseAdmin.auth.admin.deleteUser(userId);
-    
+
     if (error) {
       console.warn('Failed to delete ghost auth user:', error.message);
       return res.status(500).json({ success: false, error: error.message });
     }
-    
+
     console.log(`✅ Successfully destroyed ghost auth user: ${userId}`);
     res.json({ success: true, message: 'Ghost user deleted successfully' });
   } catch (err) {
@@ -609,7 +609,7 @@ app.get('/api/projects', async (req, res) => {
       .from('projects')
       .select('*')
       .order('created_at', { ascending: false });
-      
+
     if (projectsErr) throw projectsErr;
 
     // Fetch related profiles manually to avoid schema cache join issues
@@ -658,7 +658,7 @@ app.get('/api/projects', async (req, res) => {
 app.post('/api/projects', async (req, res) => {
   try {
     const { roles, ...projectData } = req.body;
-    
+
     // Sanitize owner_id to ensure it is a valid UUID or undefined so Postgres UUID type doesn't throw 22P02 syntax error
     const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
     if (projectData.owner_id && !uuidRegex.test(projectData.owner_id)) {
@@ -670,9 +670,9 @@ app.post('/api/projects', async (req, res) => {
       .insert(projectData)
       .select()
       .single();
-    
+
     if (projectErr) throw projectErr;
-    
+
     const projectId = projectRes.id;
     if (roles && Array.isArray(roles) && roles.length > 0) {
       const rolesToInsert = roles.map(r => ({
@@ -682,7 +682,7 @@ app.post('/api/projects', async (req, res) => {
       }));
       await supabaseAdmin.from('project_roles').insert(rolesToInsert);
     }
-    
+
     res.json({ success: true, data: projectRes });
   } catch (err) {
     console.error('Project sync error:', err);
@@ -725,7 +725,7 @@ app.post('/api/tickets', async (req, res) => {
       user_email: userEmail || process.env.NOTIFY_EMAIL || 'pinditarun6@gmail.com',
       created_at: new Date().toISOString()
     };
-    
+
     // Save to DB
     const { error: dbErr } = await supabaseAdmin.from('support_tickets').insert(ticketObj);
     if (dbErr) console.warn('Supabase ticket insert error:', dbErr.message);
@@ -794,17 +794,17 @@ app.post('/api/auth/forgot-password', async (req, res) => {
     if (!email) {
       return res.status(400).json({ success: false, error: 'Email is required' });
     }
-    
+
     const cleanEmail = email.toLowerCase().trim();
-    
+
     // Generate real 6-digit OTP
     const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
     const expiresAt = Date.now() + 15 * 60 * 1000;
     forgotOtpStore.set(cleanEmail, { otpCode, expiresAt });
-    
+
     // Send email using our working resend setup
     const emailResult = await sendOtpEmail(cleanEmail, otpCode);
-    
+
     res.json({
       success: true,
       message: 'Reset link sent to your email.'
@@ -824,9 +824,9 @@ app.post('/api/auth/verify-reset-password', async (req, res) => {
 
     const cleanEmail = email.toLowerCase().trim();
     const cleanOtp = otp.toString().trim();
-    
+
     const storedData = forgotOtpStore.get(cleanEmail);
-    
+
     if (!storedData || storedData.otpCode !== cleanOtp || Date.now() > storedData.expiresAt) {
       return res.status(400).json({ success: false, error: 'Invalid or expired OTP code.' });
     }
@@ -836,16 +836,16 @@ app.post('/api/auth/verify-reset-password', async (req, res) => {
     const authUser = users ? users.find((u) => u.email && u.email.toLowerCase() === cleanEmail) : null;
 
     if (!authUser) {
-       return res.status(404).json({ success: false, error: 'No account found with this email.' });
+      return res.status(404).json({ success: false, error: 'No account found with this email.' });
     }
 
     // Force update the password in Supabase Auth
     const { error: updateErr } = await supabaseAdmin.auth.admin.updateUserById(authUser.id, {
-       password: newPassword
+      password: newPassword
     });
 
     if (updateErr) {
-       return res.status(400).json({ success: false, error: updateErr.message });
+      return res.status(400).json({ success: false, error: updateErr.message });
     }
 
     forgotOtpStore.delete(cleanEmail);
@@ -855,6 +855,10 @@ app.post('/api/auth/verify-reset-password', async (req, res) => {
     console.error('Verify reset error:', err);
     res.status(500).json({ success: false, error: err.message });
   }
+});
+
+app.get('/', (req, res) => {
+  res.send('PolyCollab Backend is running 🚀');
 });
 
 app.listen(PORT, () => {
