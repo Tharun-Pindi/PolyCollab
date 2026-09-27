@@ -10,8 +10,7 @@ dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-// In-memory OTP storage for registration email verification
-const otpStore = new Map();
+// OTPs will be stored in Supabase table 'otp_codes' for Vercel serverless support
 
 app.use(cors());
 app.use(express.json({ limit: '10mb' }));
@@ -56,17 +55,18 @@ app.post('/api/auth/send-signup-otp', async (req, res) => {
     const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
     const expiresAt = Date.now() + 15 * 60 * 1000; // 15 mins
 
-    const existing = otpStore.get(cleanEmail);
-    const validCodes = existing?.validCodes || [];
-    validCodes.push(otpCode);
-
-    otpStore.set(cleanEmail, {
+    // Insert OTP into Supabase (overwriting any previous OTP for this email)
+    const { error: otpError } = await supabaseAdmin.from('otp_codes').upsert({
       email: cleanEmail,
-      password,
-      validCodes,
-      otpCode,
-      expiresAt
-    });
+      password: password,
+      otp_code: otpCode,
+      expires_at: new Date(expiresAt).toISOString()
+    }, { onConflict: 'email' });
+
+    if (otpError) {
+      console.error('Supabase OTP save error:', otpError.message);
+      // We will continue anyway to try sending the email, but Vercel verification might fail if this errors
+    }
 
     // 1. Send email via Nodemailer SMTP or Resend
     const emailResult = await sendOtpEmail(cleanEmail, otpCode);
@@ -112,19 +112,29 @@ app.post('/api/auth/verify-signup-otp', async (req, res) => {
 
     const cleanEmail = email.toLowerCase().trim();
     const cleanOtp = otp.toString().trim();
-    const storedData = otpStore.get(cleanEmail);
-
-    if (!/^\d{6}$/.test(cleanOtp)) {
-      return res.status(400).json({ success: false, error: 'OTP code must be a 6-digit number.' });
-    }
-
-    // Verify against stored valid codes OR Supabase verifyOtp
+    // Verify against Supabase DB OR Supabase verifyOtp
     let isOtpValid = false;
     let authUser = null;
+    let userPassword = 'PolyCollabPass123!';
 
-    if (storedData && storedData.validCodes && storedData.validCodes.includes(cleanOtp)) {
-      isOtpValid = true;
-    } else {
+    try {
+      const { data: storedData, error: dbErr } = await supabaseAdmin
+        .from('otp_codes')
+        .select('*')
+        .eq('email', cleanEmail)
+        .single();
+
+      if (!dbErr && storedData) {
+        if (storedData.password) userPassword = storedData.password;
+        if (storedData.otp_code === cleanOtp && new Date(storedData.expires_at) > new Date()) {
+          isOtpValid = true;
+        }
+      }
+    } catch (e) {
+      console.warn('DB OTP check notice:', e.message);
+    }
+
+    if (!isOtpValid) {
       try {
         const { data: sbData, error: sbErr } = await supabaseAdmin.auth.verifyOtp({
           email: cleanEmail,
@@ -145,7 +155,6 @@ app.post('/api/auth/verify-signup-otp', async (req, res) => {
     }
 
     let verifiedUser = authUser || { id: 'user_' + Date.now(), email: cleanEmail };
-    const userPassword = storedData?.password || 'PolyCollabPass123!';
 
     if (!authUser) {
       try {
@@ -199,8 +208,8 @@ app.post('/api/auth/verify-signup-otp', async (req, res) => {
       console.warn('Notice inserting base profile into Supabase:', profileErr.message);
     }
 
-    // Clear verified OTP
-    otpStore.delete(cleanEmail);
+    // Clear verified OTP from DB
+    await supabaseAdmin.from('otp_codes').delete().eq('email', cleanEmail);
 
     res.json({
       success: true,
@@ -875,7 +884,11 @@ app.get('/', (req, res) => {
   res.send('PolyCollab Backend is running 🚀');
 });
 
-app.listen(PORT, () => {
-  console.log(`🚀 PolyCollab Backend server listening on port ${PORT}`);
-});
+if (process.env.NODE_ENV !== 'production') {
+  app.listen(PORT, () => {
+    console.log(`🚀 PolyCollab Backend server listening on port ${PORT}`);
+  });
+}
+
+export default app;
 

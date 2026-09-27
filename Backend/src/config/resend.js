@@ -153,44 +153,11 @@ export const sendOtpEmail = async (targetEmail, otpCode) => {
     </div>
   `;
 
+  // 1. Try Nodemailer SMTP if SMTP_PASS is configured in .env
   const smtpUser = process.env.SMTP_USER || process.env.EMAIL_USER || process.env.NOTIFY_EMAIL || 'pinditarun6@gmail.com';
-  const brevoApiKey = process.env.BREVO_API_KEY;
-
-  // 1. Try Brevo HTTP API (Best for Render Free Tier)
-  if (brevoApiKey) {
-    try {
-      const response = await fetch('https://api.brevo.com/v3/smtp/email', {
-        method: 'POST',
-        headers: {
-          'accept': 'application/json',
-          'api-key': brevoApiKey,
-          'content-type': 'application/json'
-        },
-        body: JSON.stringify({
-          sender: { name: "PolyCollab Auth", email: smtpUser },
-          to: [{ email: cleanTarget }],
-          subject: `[PolyCollab] Your 6-Digit Verification Code is ${otpCode}`,
-          htmlContent: htmlContent
-        })
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.message || 'Brevo API Error');
-      }
-
-      console.log(`✅ OTP Email (${otpCode}) successfully sent via Brevo API to ${cleanTarget}`);
-      return { success: true, method: 'brevo' };
-    } catch (err) {
-      console.warn('⚠️ Brevo API notice:', err.message);
-      // If Brevo fails, fall through to other methods
-    }
-  }
-
-  // 2. Try Nodemailer SMTP if SMTP_PASS is configured in .env
   const smtpPass = process.env.SMTP_PASS || process.env.EMAIL_PASS;
+
   let nodemailerErr = null;
-  
   if (smtpPass) {
     try {
       const transporter = nodemailer.createTransport({
@@ -216,7 +183,7 @@ export const sendOtpEmail = async (targetEmail, otpCode) => {
     }
   }
 
-  // 3. Try Resend API directly to cleanTarget
+  // 2. Try Resend API directly to cleanTarget
   try {
     const { data, error } = await resend.emails.send({
       from: 'PolyCollab Auth <onboarding@resend.dev>',
