@@ -3,7 +3,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { getStoredData } from '../lib/storage';
 import { getTranslation } from '../lib/i18n';
 
-export default function Sidebar() {
+export default function Sidebar({ isOpen, setIsOpen }) {
   const location = useLocation();
   const navigate = useNavigate();
   const [language, setLanguage] = useState(() => {
@@ -19,6 +19,13 @@ export default function Sidebar() {
     window.addEventListener('polycollab_state_change', handleStorageChange);
     return () => window.removeEventListener('polycollab_state_change', handleStorageChange);
   }, []);
+
+  // Close sidebar automatically on route changes in mobile view
+  useEffect(() => {
+    if (isOpen) {
+      setIsOpen(false);
+    }
+  }, [location.pathname]);
 
   const isTelugu = language === 'Telugu' || language === 'Telugu (తెలుగు)';
 
@@ -38,9 +45,17 @@ export default function Sidebar() {
   ];
 
   return (
-    <nav className="fixed left-0 top-0 h-full w-[260px] bg-surface border-r border-outline-variant flex flex-col py-lg z-50">
-      <div className="px-lg mb-xl">
-        <Link to="/dashboard" className="flex items-center gap-md">
+    <>
+      {/* Mobile Overlay */}
+      {isOpen && (
+        <div 
+          className="fixed inset-0 bg-black/50 z-40 md:hidden"
+          onClick={() => setIsOpen(false)}
+        />
+      )}
+      <nav className={`fixed left-0 top-0 h-full w-[260px] bg-surface border-r border-outline-variant flex flex-col py-lg z-50 transition-transform duration-300 ${isOpen ? 'translate-x-0' : '-translate-x-full'} md:translate-x-0`}>
+        <div className="px-lg mb-xl flex justify-between items-center">
+          <Link to="/dashboard" className="flex items-center gap-md" onClick={() => setIsOpen(false)}>
           <img 
             src="/logo.png" 
             alt="PolyCollab Logo" 

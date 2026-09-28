@@ -4,7 +4,7 @@ import { getUserProfile, getUserAvatar, getStoredData } from '../lib/storage';
 import { getTranslation } from '../lib/i18n';
 import { supabase } from '../lib/supabase';
 
-export default function Header() {
+export default function Header({ onMenuClick }) {
   const navigate = useNavigate();
   const [profile, setProfile] = useState(() => getUserProfile());
   const [searchTerm, setSearchTerm] = useState('');
@@ -51,8 +51,18 @@ export default function Header() {
 
   return (
     <>
-      <header className="fixed top-0 right-0 w-[calc(100%-260px)] h-16 bg-surface/80 backdrop-blur-md border-b border-outline-variant flex items-center justify-between px-lg gap-md z-40">
-      <div className="flex-1 flex items-center"></div>
+      <header className="fixed top-0 right-0 w-full md:w-[calc(100%-260px)] h-16 bg-surface/80 backdrop-blur-md border-b border-outline-variant flex items-center justify-between px-md md:px-lg gap-md z-40 transition-all duration-300">
+      <div className="flex-1 flex items-center gap-2">
+        {onMenuClick && (
+          <button
+            className="md:hidden w-10 h-10 flex items-center justify-center text-on-surface hover:text-primary transition-colors cursor-pointer rounded-full hover:bg-surface-container"
+            onClick={onMenuClick}
+            aria-label="Toggle menu"
+          >
+            <span className="material-symbols-outlined">menu</span>
+          </button>
+        )}
+      </div>
       <div className="flex items-center gap-md">
         <Link
           to="/help"

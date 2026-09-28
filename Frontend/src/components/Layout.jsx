@@ -5,7 +5,7 @@ import Header from './Header';
 import { loadSettings } from '../lib/storage';
 
 export default function Layout() {
-  const [instantNotifToast, setInstantNotifToast] = useState(null);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   useEffect(() => {
     const handleInstantNotif = (e) => {
@@ -70,6 +70,13 @@ export default function Layout() {
     };
   }, []);
 
+  // Close sidebar on location change for mobile
+  useEffect(() => {
+    const handleLocationChange = () => setIsSidebarOpen(false);
+    window.addEventListener('popstate', handleLocationChange);
+    return () => window.removeEventListener('popstate', handleLocationChange);
+  }, []);
+
   return (
     <div className="bg-background text-on-surface font-body-md antialiased h-screen overflow-hidden flex relative">
       {/* Instant Push Notification Toast Alert */}
@@ -90,9 +97,9 @@ export default function Layout() {
           </button>
         </div>
       )}
-      <Sidebar />
-      <Header />
-      <main className="ml-[260px] mt-16 p-lg w-[calc(100%-260px)] h-[calc(100vh-4rem)] overflow-y-auto">
+      <Sidebar isOpen={isSidebarOpen} setIsOpen={setIsSidebarOpen} />
+      <Header onMenuClick={() => setIsSidebarOpen(true)} />
+      <main className="w-full md:w-[calc(100%-260px)] ml-0 md:ml-[260px] mt-16 p-sm md:p-lg h-[calc(100vh-4rem)] overflow-y-auto transition-all duration-300">
         <Outlet />
       </main>
     </div>
