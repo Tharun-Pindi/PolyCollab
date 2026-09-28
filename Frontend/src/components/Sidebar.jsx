@@ -107,6 +107,7 @@ export default function Sidebar({ isOpen, setIsOpen }) {
         })}
       </div>
     </nav>
+    </>
   );
 }
 
