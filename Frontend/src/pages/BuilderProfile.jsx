@@ -220,10 +220,6 @@ export default function BuilderProfile() {
   const frontend = profile.techStack?.frontend || [];
   const backend = profile.techStack?.backend || [];
 
-  if (isLoading) {
-    return null;
-  }
-
   return (
     <div className="max-w-container-max mx-auto space-y-lg relative">
       {/* Toast Alert */}

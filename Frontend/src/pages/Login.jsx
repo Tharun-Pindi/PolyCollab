@@ -238,7 +238,7 @@ export default function Login() {
                   fillRule="evenodd"
                 ></path>
               </svg>
-              Continue with GitHub
+              Login with GitHub
             </button>
 
             <Link

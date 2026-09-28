@@ -63,37 +63,36 @@ export default function CreateAccount() {
     setInfoMsg(null);
     setOtp('');
 
-    try {
-      // 1. Dispatch real email OTP via Express Backend (Resend API)
-      const res = await fetch(`${import.meta.env.VITE_BACKEND_API_URL}/api/auth/send-signup-otp`
-        , {
+    // Dispatch real email OTP in background to avoid UI lag
+    (async () => {
+      try {
+        const res = await fetch(`${import.meta.env.VITE_BACKEND_API_URL}/api/auth/send-signup-otp`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ email: formData.email, password: formData.password })
         });
 
-      const resData = await res.json();
-      if (resData.success && resData.message) {
-        setInfoMsg(resData.message);
-      } else if (resData.error) {
-        setLoading(false);
-        return setErrorMsg(resData.error);
-      } else {
+        const resData = await res.json();
+        if (resData.success && resData.message) {
+          // Message already set optimistically
+        } else if (resData.error) {
+          setErrorMsg(resData.error);
+        } else {
+          await supabase.auth.signInWithOtp({
+            email: formData.email,
+            options: { shouldCreateUser: true }
+          });
+        }
+      } catch (err) {
+        console.warn("Backend email dispatch fallback:", err);
         await supabase.auth.signInWithOtp({
           email: formData.email,
           options: { shouldCreateUser: true }
-        });
-        setInfoMsg(`Verification code sent to ${formData.email}. Please check your email inbox and spam folder.`);
+        }).catch(() => { });
       }
-    } catch (err) {
-      console.warn("Backend email dispatch fallback:", err);
-      await supabase.auth.signInWithOtp({
-        email: formData.email,
-        options: { shouldCreateUser: true }
-      }).catch(() => { });
-      setInfoMsg(`Verification code sent to ${formData.email}. Please check your email inbox and spam folder.`);
-    }
+    })();
 
+    setInfoMsg(`Verification code sent to ${formData.email}. Please check your email inbox and spam folder.`);
     setLoading(false);
     setStep(2);
   };
