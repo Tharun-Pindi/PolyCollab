@@ -6,6 +6,7 @@ import { loadSettings } from '../lib/storage';
 
 export default function Layout() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [instantNotifToast, setInstantNotifToast] = useState(null);
 
   useEffect(() => {
     const handleInstantNotif = (e) => {
