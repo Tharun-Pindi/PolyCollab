@@ -25,6 +25,7 @@ import HelpSupport from './pages/HelpSupport';
 import ViewProject from './pages/ViewProject';
 import ForgotPassword from './pages/ForgotPassword';
 import ResetPassword from './pages/ResetPassword';
+import AdminDashboard from './pages/AdminDashboard';
 
 import { supabase } from './lib/supabase';
 import { getUserProfile, saveUserProfile, subscribeToSupabaseRealtime } from './lib/storage';
@@ -272,6 +273,7 @@ export default function App() {
           <Route path="/bookmarks" element={<Bookmarks />} />
           <Route path="/settings" element={<Settings />} />
           <Route path="/help" element={<HelpSupport />} />
+          <Route path="/admin-dashboard" element={<AdminDashboard />} />
         </Route>
       </Routes>
     </ErrorBoundary>

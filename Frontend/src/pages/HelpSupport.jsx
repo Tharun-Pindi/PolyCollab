@@ -146,15 +146,62 @@ export default function HelpSupport() {
     category: 'Technical Support',
     priority: 'Medium',
     description: '',
-    attachmentName: ''
+    attachmentName: '',
+    attachmentUrl: '' // Cloudinary secure URL after upload
   });
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadError, setUploadError] = useState('');
 
   const selectedDoc = activeDocKey ? DOCS_DATA[activeDocKey] : null;
 
-  const handleFileChange = (e) => {
+  const handleFileChange = async (e) => {
     const file = e.target.files[0];
-    if (file) {
-      setTicketForm((prev) => ({ ...prev, attachmentName: file.name }));
+    if (!file) return;
+
+    // Only allow images
+    if (!file.type.startsWith('image/')) {
+      setUploadError('Only image files (JPG, PNG, WEBP) are allowed.');
+      return;
+    }
+    // Max 5MB
+    if (file.size > 5 * 1024 * 1024) {
+      setUploadError('File size must be under 5MB.');
+      return;
+    }
+
+    setUploadError('');
+    setIsUploading(true);
+    setTicketForm((prev) => ({ ...prev, attachmentName: file.name, attachmentUrl: '' }));
+
+    try {
+      // Read file as base64
+      const reader = new FileReader();
+      reader.onload = async (event) => {
+        const base64 = event.target.result; // data:image/png;base64,...
+        try {
+          const res = await fetch(`${import.meta.env.VITE_BACKEND_API_URL}/api/upload`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ image: base64, folder: 'polycollab_tickets' })
+          });
+          const data = await res.json();
+          if (data.success && data.url) {
+            setTicketForm((prev) => ({ ...prev, attachmentUrl: data.url }));
+          } else {
+            setUploadError('Upload failed. Please try again.');
+            setTicketForm((prev) => ({ ...prev, attachmentName: '', attachmentUrl: '' }));
+          }
+        } catch (err) {
+          setUploadError('Upload failed. Check your connection.');
+          setTicketForm((prev) => ({ ...prev, attachmentName: '', attachmentUrl: '' }));
+        } finally {
+          setIsUploading(false);
+        }
+      };
+      reader.readAsDataURL(file);
+    } catch (err) {
+      setUploadError('Could not read file.');
+      setIsUploading(false);
     }
   };
 
@@ -185,6 +232,7 @@ export default function HelpSupport() {
               priority: ticketForm.priority,
               description: ticketForm.description,
               attachmentName: ticketForm.attachmentName,
+              attachmentUrl: ticketForm.attachmentUrl, // Cloudinary URL
               userEmail: realEmail,
               userName: currentUser.fullName || 'Builder'
             })
@@ -199,6 +247,7 @@ export default function HelpSupport() {
         priority: ticketForm.priority,
         description: ticketForm.description,
         attachmentName: ticketForm.attachmentName,
+        attachmentUrl: ticketForm.attachmentUrl,
         userEmail: realEmail
       });
 
@@ -212,8 +261,10 @@ export default function HelpSupport() {
         category: 'Technical Support',
         priority: 'Medium',
         description: '',
-        attachmentName: ''
+        attachmentName: '',
+        attachmentUrl: ''
       });
+      setUploadError('');
     }, 400);
   };
 
@@ -360,7 +411,6 @@ export default function HelpSupport() {
                         className="w-full bg-surface-container-lowest border border-outline-variant rounded-lg px-3 py-2 pr-8 text-sm focus:border-primary outline-none appearance-none cursor-pointer"
                       >
                         <option value="Technical Support">Technical Support</option>
-                        <option value="Billing & Plans">Billing & Plans</option>
                         <option value="Account & Profile">Account & Profile</option>
                         <option value="Feature Request">Feature Request</option>
                         <option value="General Inquiry">General Inquiry</option>
@@ -401,14 +451,52 @@ export default function HelpSupport() {
 
                 <div className="space-y-1">
                   <label className="block text-xs font-semibold text-on-surface">Attach Log / Screenshot (Optional)</label>
-                  <div className="flex items-center gap-3 bg-surface-container-lowest border border-dashed border-outline-variant rounded-lg p-3">
-                    <span className="material-symbols-outlined text-secondary">attach_file</span>
-                    <input
-                      type="file"
-                      onChange={handleFileChange}
-                      className="text-xs text-on-surface-variant file:mr-3 file:py-1 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-primary/10 file:text-primary hover:file:bg-primary/20 cursor-pointer"
-                    />
+                  <div className={`flex items-center gap-3 bg-surface-container-lowest border border-dashed rounded-lg p-3 transition-colors ${
+                    isUploading ? 'border-primary/50 bg-primary/5' :
+                    ticketForm.attachmentUrl ? 'border-emerald-500/50 bg-emerald-500/5' :
+                    uploadError ? 'border-red-400/50' : 'border-outline-variant'
+                  }`}>
+                    <span className={`material-symbols-outlined ${
+                      isUploading ? 'text-primary animate-pulse' :
+                      ticketForm.attachmentUrl ? 'text-emerald-500' :
+                      uploadError ? 'text-red-400' : 'text-secondary'
+                    }`}>
+                      {isUploading ? 'cloud_upload' : ticketForm.attachmentUrl ? 'check_circle' : 'attach_file'}
+                    </span>
+                    <div className="flex-1 min-w-0">
+                      {isUploading ? (
+                        <p className="text-xs text-primary font-medium">Uploading to cloud... please wait</p>
+                      ) : ticketForm.attachmentUrl ? (
+                        <div className="space-y-1">
+                          <p className="text-xs text-emerald-600 font-semibold truncate">✓ {ticketForm.attachmentName} — uploaded</p>
+                          <a href={ticketForm.attachmentUrl} target="_blank" rel="noreferrer" className="text-[11px] text-primary hover:underline">View uploaded image ↗</a>
+                        </div>
+                      ) : (
+                        <input
+                          type="file"
+                          accept="image/jpeg,image/png,image/webp,image/gif"
+                          onChange={handleFileChange}
+                          disabled={isUploading}
+                          className="text-xs text-on-surface-variant file:mr-3 file:py-1 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-primary/10 file:text-primary hover:file:bg-primary/20 cursor-pointer w-full"
+                        />
+                      )}
+                      {uploadError && <p className="text-[11px] text-red-500 mt-0.5">{uploadError}</p>}
+                    </div>
+                    {ticketForm.attachmentUrl && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setTicketForm(prev => ({ ...prev, attachmentName: '', attachmentUrl: '' }));
+                          setUploadError('');
+                        }}
+                        className="p-1 rounded text-on-surface-variant hover:text-red-500 transition-colors cursor-pointer shrink-0"
+                        title="Remove attachment"
+                      >
+                        <span className="material-symbols-outlined text-[16px]">close</span>
+                      </button>
+                    )}
                   </div>
+                  <p className="text-[11px] text-on-surface-variant">Images only (JPG, PNG, WEBP) · Max 5MB</p>
                 </div>
 
                 <div className="pt-3 border-t border-outline-variant/60 flex items-center justify-end gap-3">

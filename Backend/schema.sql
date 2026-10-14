@@ -1,8 +1,4 @@
--- ============================================================
--- PolyCollab Supabase Complete Schema (Idempotent)
--- Run this in Supabase SQL Editor to safely rebuild all tables.
--- Uses CREATE TABLE IF NOT EXISTS — safe to re-run at any time.
--- ============================================================
+
 
 -- ============================================================
 -- 1. PROFILES TABLE (Extends Supabase Auth users)
@@ -104,10 +100,8 @@ CREATE TABLE IF NOT EXISTS public.project_roles (
   description TEXT
 );
 
--- ============================================================
 -- 8. PROJECT APPLICATIONS
--- Full fields required by /api/applications endpoint
--- ============================================================
+
 CREATE TABLE IF NOT EXISTS public.applications (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   project_id UUID REFERENCES public.projects(id) ON DELETE CASCADE,
@@ -136,6 +130,7 @@ CREATE TABLE IF NOT EXISTS public.support_tickets (
   status TEXT DEFAULT 'Open',
   description TEXT,
   attachment_name TEXT,
+  attachment_url TEXT,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
@@ -175,18 +170,7 @@ CREATE TABLE IF NOT EXISTS public.keep_alive_logs (
   pinged_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- ============================================================
--- NOTE: The following are intentionally NOT in the database.
--- They are handled purely via localStorage on the client:
---   • bookmarks     → polycollab_bookmarked_projects_*, bookmarked_builders_*
---   • notifications → polycollab_notifications_list
---   • build_sprints → polycollab_build_sprints (if used)
---   • messages      → not implemented yet
--- ============================================================
 
--- ============================================================
--- ROW LEVEL SECURITY — Enable on all tables
--- ============================================================
 ALTER TABLE public.profiles           ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.profile_tech_stacks ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.profile_experiences ENABLE ROW LEVEL SECURITY;
@@ -200,11 +184,7 @@ ALTER TABLE public.ticket_replies      ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.otp_codes           ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.keep_alive_logs     ENABLE ROW LEVEL SECURITY;
 
--- ============================================================
--- RLS POLICIES
--- Using service_role key on backend bypasses RLS anyway,
--- but these allow anon key access from frontend where needed.
--- ============================================================
+
 
 -- Profiles
 DROP POLICY IF EXISTS "Public Read Access Profiles"   ON public.profiles;
@@ -249,7 +229,3 @@ CREATE POLICY "Public Access Profile Preferences"  ON public.profile_preferences
 CREATE POLICY "Public Access OTP Codes"            ON public.otp_codes            FOR ALL USING (true) WITH CHECK (true);
 CREATE POLICY "Public Access Keep Alive Logs"      ON public.keep_alive_logs      FOR ALL USING (true) WITH CHECK (true);
 
--- ============================================================
--- DONE — All tables created, RLS enabled, policies set.
--- Run this script in Supabase SQL Editor after resuming project.
--- ============================================================

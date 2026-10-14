@@ -3,7 +3,7 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import { supabaseAdmin } from './config/supabase.js';
 import cloudinary from './config/cloudinary.js';
-import { sendTicketAdminNotification, sendTicketUserAutoReply, sendOtpEmail } from './config/resend.js';
+import { sendTicketAdminNotification, sendTicketUserAutoReply, sendTicketResolvedEmail, sendOtpEmail, sendApplicationAcceptedEmail } from './config/resend.js';
 
 dotenv.config();
 
@@ -697,10 +697,127 @@ app.get('/api/sprints', async (req, res) => {
   res.json({ success: true, data: [] });
 });
 
+// ============================================================
+// ADMIN DASHBOARD ROUTES
+// ============================================================
+
+// GET all support tickets (for admin dashboard)
+app.get('/api/admin/tickets', async (req, res) => {
+  try {
+    const { data, error } = await supabaseAdmin
+      .from('support_tickets')
+      .select('*')
+      .order('created_at', { ascending: false });
+    if (error) throw error;
+    res.json({ success: true, data: data || [] });
+  } catch (err) {
+    console.error('Error fetching admin tickets:', err.message);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// PATCH /api/tickets/:id/resolve — Mark ticket resolved + email user
+app.patch('/api/tickets/:id/resolve', async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const { data: ticket, error: fetchErr } = await supabaseAdmin
+      .from('support_tickets')
+      .select('*')
+      .eq('id', id)
+      .single();
+
+    if (fetchErr || !ticket) {
+      return res.status(404).json({ success: false, error: 'Ticket not found.' });
+    }
+
+    const { error: updateErr } = await supabaseAdmin
+      .from('support_tickets')
+      .update({ status: 'Resolved' })
+      .eq('id', id);
+
+    if (updateErr) throw updateErr;
+
+    // Send resolution email to user
+    const emailResult = await sendTicketResolvedEmail({ ...ticket, status: 'Resolved' });
+
+    console.log(`\u2705 Ticket ${id} marked as Resolved. Email sent: ${emailResult.success}`);
+    res.json({ success: true, message: 'Ticket resolved and user notified.', emailSent: emailResult.success });
+  } catch (err) {
+    console.error('Error resolving ticket:', err.message);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// ============================================================
+// APPLICATIONS — PATCH status (Accept / Decline)
+// ============================================================
+app.patch('/api/applications/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { status } = req.body;
+
+    if (!['Accepted', 'Declined'].includes(status)) {
+      return res.status(400).json({ success: false, error: 'Status must be Accepted or Declined.' });
+    }
+
+    const { data: app, error: fetchErr } = await supabaseAdmin
+      .from('applications')
+      .select(`
+        *,
+        applicant:profiles!applications_applicant_id_fkey(id, full_name, primary_email, avatar_url),
+        project:projects!applications_project_id_fkey(id, title, owner_id)
+      `)
+      .eq('id', id)
+      .single();
+
+    if (fetchErr || !app) {
+      return res.status(404).json({ success: false, error: 'Application not found.' });
+    }
+
+    const { error: updateErr } = await supabaseAdmin
+      .from('applications')
+      .update({ status })
+      .eq('id', id);
+
+    if (updateErr) throw updateErr;
+
+    let emailSent = false;
+    if (status === 'Accepted') {
+      const { data: ownerProfile } = await supabaseAdmin
+        .from('profiles')
+        .select('full_name')
+        .eq('id', app.project?.owner_id)
+        .single();
+
+      const emailResult = await sendApplicationAcceptedEmail({
+        applicantName: app.applicant?.full_name,
+        projectTitle: app.project?.title || 'the project',
+        roleApplied: app.role_applied,
+        ownerName: ownerProfile?.full_name || 'the project lead'
+      });
+      emailSent = emailResult.success;
+      console.log(`\u2705 Application ${id} accepted. Email sent: ${emailSent}`);
+    }
+
+    res.json({
+      success: true,
+      status,
+      emailSent,
+      message: status === 'Accepted'
+        ? 'Application accepted and applicant notified by email.'
+        : 'Application declined.'
+    });
+  } catch (err) {
+    console.error('Error updating application status:', err.message);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 // Support Tickets API with Resend Email Notifications & Auto-Reply
 app.post('/api/tickets', async (req, res) => {
   try {
-    const { subject, category, priority, description, attachmentName, userEmail, userName } = req.body;
+    const { subject, category, priority, description, attachmentName, attachmentUrl, userEmail, userName } = req.body;
     const ticketId = `TICKET-${Math.floor(1000 + Math.random() * 9000)}`;
 
     const ticketObj = {
@@ -711,7 +828,8 @@ app.post('/api/tickets', async (req, res) => {
       status: 'Open',
       description,
       attachment_name: attachmentName || null,
-      user_name: userName || 'Alex',
+      attachment_url: attachmentUrl || null,  // Cloudinary secure URL
+      user_name: userName || 'Builder',
       user_email: userEmail || process.env.NOTIFY_EMAIL || 'pinditarun6@gmail.com',
       created_at: new Date().toISOString()
     };
