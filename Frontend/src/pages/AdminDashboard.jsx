@@ -1,28 +1,60 @@
 import React, { useState, useEffect } from 'react';
-import { getUserProfile } from '../lib/storage';
 
-const ADMIN_EMAIL = 'pinditarun6@gmail.com';
+// Admin credentials are loaded from .env — never hardcode secrets in source code
+const ADMIN_EMAIL = import.meta.env.VITE_ADMIN_EMAIL;
+const ADMIN_PASSWORD = import.meta.env.VITE_ADMIN_PASSWORD;
+const SESSION_KEY = 'polycollab_admin_unlocked';
 
 export default function AdminDashboard() {
+  // --- Gate State ---
+  const [gateEmail, setGateEmail] = useState('');
+  const [gatePassword, setGatePassword] = useState('');
+  const [gateError, setGateError] = useState('');
+  const [gateLoading, setGateLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [isUnlocked, setIsUnlocked] = useState(() => {
+    // Persist unlock within the session (cleared on tab close)
+    return sessionStorage.getItem(SESSION_KEY) === 'true';
+  });
+
+  // --- Dashboard State ---
   const [tickets, setTickets] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [resolvingId, setResolvingId] = useState(null);
   const [toastMsg, setToastMsg] = useState(null);
-  const [filter, setFilter] = useState('all'); // 'all' | 'Open' | 'Resolved'
+  const [filter, setFilter] = useState('all');
   const [expandedTicket, setExpandedTicket] = useState(null);
 
-  const currentUser = getUserProfile();
-  const isAdmin = currentUser?.primaryEmail === ADMIN_EMAIL;
-
   useEffect(() => {
-    if (!isAdmin) return;
-    fetchTickets();
-  }, []);
+    if (isUnlocked) fetchTickets();
+  }, [isUnlocked]);
+
+  const handleGateSubmit = async (e) => {
+    e.preventDefault();
+    setGateError('');
+    setGateLoading(true);
+
+    // Slight artificial delay so it feels like a real auth check
+    await new Promise(r => setTimeout(r, 800));
+
+    const emailMatch = gateEmail.trim().toLowerCase() === ADMIN_EMAIL?.toLowerCase();
+    const passwordMatch = gatePassword === ADMIN_PASSWORD;
+
+    if (emailMatch && passwordMatch) {
+      sessionStorage.setItem(SESSION_KEY, 'true');
+      setIsUnlocked(true);
+    } else {
+      setGateError('Invalid email or password. Access denied.');
+      setGatePassword('');
+    }
+    setGateLoading(false);
+  };
 
   const fetchTickets = async () => {
+    setLoading(true);
+    setError(null);
     try {
-      setLoading(true);
       const res = await fetch(`${import.meta.env.VITE_BACKEND_API_URL}/api/admin/tickets`);
       const json = await res.json();
       if (json.success) {
@@ -63,20 +95,120 @@ export default function AdminDashboard() {
     }
   };
 
-  if (!isAdmin) {
+  // ============================================================
+  // GATE — Admin login screen
+  // ============================================================
+  if (!isUnlocked) {
     return (
-      <div className="max-w-container-max mx-auto">
-        <div className="bg-surface-container-lowest border border-red-300 rounded-xl p-xl text-center space-y-4">
-          <div className="w-16 h-16 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center mx-auto">
-            <span className="material-symbols-outlined text-red-500 text-[32px]">shield</span>
+      <div className="min-h-[80vh] flex items-center justify-center">
+        <div className="w-full max-w-sm space-y-6">
+          {/* Icon */}
+          <div className="text-center space-y-3">
+            <div className="w-16 h-16 rounded-2xl bg-primary/10 border border-primary/20 flex items-center justify-center mx-auto">
+              <span className="material-symbols-outlined text-primary text-[32px]">admin_panel_settings</span>
+            </div>
+            <div>
+              <h1 className="text-xl font-bold text-on-surface">Admin Login</h1>
+              <p className="text-sm text-on-surface-variant mt-1">Enter your admin credentials to continue</p>
+            </div>
           </div>
-          <h2 className="font-headline-md text-headline-md text-on-surface font-bold">Access Denied</h2>
-          <p className="text-on-surface-variant">This page is restricted to PolyCollab administrators only.</p>
+
+          {/* Form Card */}
+          <div className="bg-surface-container-lowest border border-outline-variant rounded-2xl p-6 shadow-sm space-y-4">
+            {gateError && (
+              <div className="flex items-center gap-2 p-3 bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800 rounded-xl text-sm text-red-700 dark:text-red-400">
+                <span className="material-symbols-outlined text-[18px] shrink-0">block</span>
+                {gateError}
+              </div>
+            )}
+
+            <form onSubmit={handleGateSubmit} className="space-y-4">
+              {/* Email */}
+              <div>
+                <label className="block text-sm font-semibold text-on-surface mb-1.5" htmlFor="admin-email-input">
+                  Email
+                </label>
+                <div className="relative">
+                  <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-outline text-[20px] pointer-events-none">
+                    mail
+                  </span>
+                  <input
+                    id="admin-email-input"
+                    type="email"
+                    placeholder="Admin email address"
+                    value={gateEmail}
+                    onChange={(e) => { setGateEmail(e.target.value); setGateError(''); }}
+                    required
+                    autoFocus
+                    autoComplete="email"
+                    className="w-full pl-10 pr-4 py-2.5 bg-surface-container border border-outline-variant rounded-xl text-sm text-on-surface placeholder:text-outline/60 focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/10 transition-all"
+                  />
+                </div>
+              </div>
+
+              {/* Password */}
+              <div>
+                <label className="block text-sm font-semibold text-on-surface mb-1.5" htmlFor="admin-password-input">
+                  Password
+                </label>
+                <div className="relative">
+                  <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-outline text-[20px] pointer-events-none">
+                    lock
+                  </span>
+                  <input
+                    id="admin-password-input"
+                    type={showPassword ? 'text' : 'password'}
+                    placeholder="Admin password"
+                    value={gatePassword}
+                    onChange={(e) => { setGatePassword(e.target.value); setGateError(''); }}
+                    required
+                    autoComplete="current-password"
+                    className="w-full pl-10 pr-10 py-2.5 bg-surface-container border border-outline-variant rounded-xl text-sm text-on-surface placeholder:text-outline/60 focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/10 transition-all"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(p => !p)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-outline hover:text-on-surface transition-colors cursor-pointer"
+                    tabIndex={-1}
+                  >
+                    <span className="material-symbols-outlined text-[20px]">
+                      {showPassword ? 'visibility_off' : 'visibility'}
+                    </span>
+                  </button>
+                </div>
+              </div>
+
+              <button
+                type="submit"
+                disabled={gateLoading || !gateEmail.trim() || !gatePassword.trim()}
+                className="w-full flex items-center justify-center gap-2 py-2.5 px-4 bg-primary text-on-primary rounded-xl text-sm font-semibold hover:bg-primary/90 transition-all cursor-pointer disabled:opacity-50 active:scale-[0.98]"
+              >
+                {gateLoading ? (
+                  <>
+                    <span className="material-symbols-outlined text-[18px] animate-spin">progress_activity</span>
+                    Signing in...
+                  </>
+                ) : (
+                  <>
+                    <span className="material-symbols-outlined text-[18px]">login</span>
+                    Sign In
+                  </>
+                )}
+              </button>
+            </form>
+          </div>
+
+          <p className="text-center text-xs text-on-surface-variant">
+            Restricted to PolyCollab administrators only
+          </p>
         </div>
       </div>
     );
   }
 
+  // ============================================================
+  // DASHBOARD — visible after unlock
+  // ============================================================
   const filtered = filter === 'all' ? tickets : tickets.filter(t => t.status === filter);
   const openCount = tickets.filter(t => t.status === 'Open').length;
   const resolvedCount = tickets.filter(t => t.status === 'Resolved').length;
@@ -92,7 +224,7 @@ export default function AdminDashboard() {
     <div className="max-w-container-max mx-auto space-y-lg relative">
       {/* Toast */}
       {toastMsg && (
-        <div className={`fixed top-5 right-5 z-50 flex items-center gap-3 px-5 py-3 rounded-xl shadow-2xl text-sm font-semibold animate-in slide-in-from-top-2 fade-in ${
+        <div className={`fixed top-5 right-5 z-50 flex items-center gap-3 px-5 py-3 rounded-xl shadow-2xl text-sm font-semibold ${
           toastMsg.type === 'success' ? 'bg-emerald-600 text-white' : 'bg-red-600 text-white'
         }`}>
           <span className="material-symbols-outlined text-[18px]">
@@ -104,24 +236,31 @@ export default function AdminDashboard() {
 
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-md">
-        <div>
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-primary/10 text-primary flex items-center justify-center">
-              <span className="material-symbols-outlined text-[24px]">admin_panel_settings</span>
-            </div>
-            <div>
-              <h1 className="font-headline-lg text-headline-lg text-on-surface">Admin Dashboard</h1>
-              <p className="font-body-md text-body-md text-on-surface-variant">Manage and resolve support tickets</p>
-            </div>
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-primary/10 text-primary flex items-center justify-center">
+            <span className="material-symbols-outlined text-[24px]">admin_panel_settings</span>
+          </div>
+          <div>
+            <h1 className="font-headline-lg text-headline-lg text-on-surface">Admin Dashboard</h1>
+            <p className="font-body-md text-body-md text-on-surface-variant">Manage and resolve support tickets</p>
           </div>
         </div>
-        <button
-          onClick={fetchTickets}
-          className="flex items-center gap-2 px-4 py-2 bg-surface-container border border-outline-variant rounded-lg text-sm font-semibold text-on-surface hover:bg-surface-container-high transition-colors cursor-pointer"
-        >
-          <span className="material-symbols-outlined text-[18px]">refresh</span>
-          Refresh
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={fetchTickets}
+            className="flex items-center gap-2 px-4 py-2 bg-surface-container border border-outline-variant rounded-lg text-sm font-semibold text-on-surface hover:bg-surface-container-high transition-colors cursor-pointer"
+          >
+            <span className="material-symbols-outlined text-[18px]">refresh</span>
+            Refresh
+          </button>
+          <button
+            onClick={() => { sessionStorage.removeItem(SESSION_KEY); setIsUnlocked(false); setGateEmail(''); }}
+            className="flex items-center gap-2 px-4 py-2 bg-surface-container border border-outline-variant rounded-lg text-sm font-semibold text-on-surface-variant hover:text-red-500 hover:border-red-300 transition-colors cursor-pointer"
+          >
+            <span className="material-symbols-outlined text-[18px]">lock</span>
+            Lock
+          </button>
+        </div>
       </div>
 
       {/* Stats */}
@@ -171,9 +310,7 @@ export default function AdminDashboard() {
         )}
 
         {!loading && error && (
-          <div className="p-lg text-center text-red-500">
-            <p>Error: {error}</p>
-          </div>
+          <div className="p-lg text-center text-red-500">Error: {error}</div>
         )}
 
         {!loading && !error && filtered.length === 0 && (
@@ -194,7 +331,6 @@ export default function AdminDashboard() {
 
           return (
             <div key={ticket.id} className="hover:bg-surface-container-low/30 transition-colors">
-              {/* Ticket Row */}
               <div
                 className="p-md flex flex-col md:flex-row md:items-center justify-between gap-md cursor-pointer"
                 onClick={() => setExpandedTicket(isExpanded ? null : ticket.id)}
@@ -211,14 +347,18 @@ export default function AdminDashboard() {
                         {ticket.category}
                       </span>
                       <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${
-                        isOpen ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400' : 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400'
+                        isOpen
+                          ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'
+                          : 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400'
                       }`}>
                         {ticket.status}
                       </span>
                     </div>
                     <h4 className="text-sm font-semibold text-on-surface truncate">{ticket.subject}</h4>
                     <p className="text-xs text-on-surface-variant">
-                      {ticket.user_name || 'User'} ({ticket.user_email}) • {new Date(ticket.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                      {ticket.user_name || 'User'} ({ticket.user_email})
+                      {' • '}
+                      {new Date(ticket.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
                     </p>
                   </div>
                 </div>
