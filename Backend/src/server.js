@@ -591,26 +591,7 @@ app.get('/api/applications/lead/:ownerId', async (req, res) => {
   }
 });
 
-app.delete('/api/users/:id', async (req, res) => {
-  try {
-    const userId = req.params.id;
-    if (!userId) return res.status(400).json({ success: false, error: 'User ID is required' });
-
-    console.log(`🧹 Attempting to clean up ghost auth user: ${userId}`);
-    const { error } = await supabaseAdmin.auth.admin.deleteUser(userId);
-
-    if (error) {
-      console.warn('Failed to delete ghost auth user:', error.message);
-      return res.status(500).json({ success: false, error: error.message });
-    }
-
-    console.log(`✅ Successfully destroyed ghost auth user: ${userId}`);
-    res.json({ success: true, message: 'Ghost user deleted successfully' });
-  } catch (err) {
-    console.error('Unexpected error deleting user:', err);
-    res.status(500).json({ success: false, error: err.message });
-  }
-});
+// (Duplicate DELETE /api/users/:id removed — full version below at /api/users/:id)
 
 app.get('/api/projects', async (req, res) => {
   try {
@@ -793,10 +774,8 @@ app.delete('/api/users/:id', async (req, res) => {
   }
 });
 
-// OTP Store for Password Reset
-const forgotOtpStore = new Map();
-
 // Forgot Password Endpoint
+// OTP is stored in Supabase otp_codes table (NOT in-memory — serverless safe)
 app.post('/api/auth/forgot-password', async (req, res) => {
   try {
     const { email } = req.body;
@@ -806,24 +785,57 @@ app.post('/api/auth/forgot-password', async (req, res) => {
 
     const cleanEmail = email.toLowerCase().trim();
 
+    // Verify the account actually exists before sending OTP
+    const { data: dbProfile } = await supabaseAdmin
+      .from('profiles')
+      .select('id')
+      .eq('primary_email', cleanEmail)
+      .maybeSingle();
+
+    if (!dbProfile) {
+      return res.status(404).json({ success: false, error: 'No account found with this email address.' });
+    }
+
     // Generate real 6-digit OTP
     const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
-    const expiresAt = Date.now() + 15 * 60 * 1000;
-    forgotOtpStore.set(cleanEmail, { otpCode, expiresAt });
+    const expiresAt = new Date(Date.now() + 15 * 60 * 1000).toISOString();
 
-    // Send email using our working resend setup
+    // ✅ Store OTP in Supabase — survives serverless cold starts unlike in-memory Map
+    const { error: otpErr } = await supabaseAdmin.from('otp_codes').upsert({
+      email: cleanEmail,
+      otp_code: otpCode,
+      otp_type: 'reset',
+      expires_at: expiresAt
+    }, { onConflict: 'email' });
+
+    if (otpErr) {
+      console.error('Failed to save reset OTP to Supabase:', otpErr.message);
+      return res.status(500).json({ success: false, error: 'Failed to generate reset code. Please try again.' });
+    }
+
+    // Send OTP email via Nodemailer SMTP (Gmail) → Resend fallback
     const emailResult = await sendOtpEmail(cleanEmail, otpCode);
+
+    console.log(`\n======================================================`);
+    console.log(`🔑 PASSWORD RESET OTP FOR ${cleanEmail}`);
+    console.log(`👉 OTP CODE: ${otpCode}`);
+    console.log(`STATUS: ${emailResult.success ? '✅ EMAIL DELIVERED' : '⚠️ EMAIL NOT DELIVERED'}`);
+    console.log(`======================================================\n`);
 
     res.json({
       success: true,
-      message: 'Reset link sent to your email.'
+      message: emailResult.success
+        ? 'Reset code sent to your email. Please check your inbox and spam folder.'
+        : `Reset code generated. (Code: ${otpCode} — check backend terminal log)`,
+      emailSent: emailResult.success
     });
   } catch (err) {
+    console.error('Forgot password error:', err);
     res.status(500).json({ success: false, error: err.message });
   }
 });
 
-// Verify Reset Password OTP
+// Verify Reset Password OTP — reads from Supabase, not in-memory Map
 app.post('/api/auth/verify-reset-password', async (req, res) => {
   try {
     const { email, otp, newPassword } = req.body;
@@ -834,22 +846,40 @@ app.post('/api/auth/verify-reset-password', async (req, res) => {
     const cleanEmail = email.toLowerCase().trim();
     const cleanOtp = otp.toString().trim();
 
-    const storedData = forgotOtpStore.get(cleanEmail);
+    // ✅ Read OTP from Supabase
+    const { data: storedData, error: dbErr } = await supabaseAdmin
+      .from('otp_codes')
+      .select('*')
+      .eq('email', cleanEmail)
+      .eq('otp_type', 'reset')
+      .single();
 
-    if (!storedData || storedData.otpCode !== cleanOtp || Date.now() > storedData.expiresAt) {
-      return res.status(400).json({ success: false, error: 'Invalid or expired OTP code.' });
+    if (dbErr || !storedData) {
+      return res.status(400).json({ success: false, error: 'No reset code found. Please request a new one.' });
     }
 
-    // Find the user in Auth admin
-    const { data: { users }, error: listErr } = await supabaseAdmin.auth.admin.listUsers();
-    const authUser = users ? users.find((u) => u.email && u.email.toLowerCase() === cleanEmail) : null;
+    if (storedData.otp_code !== cleanOtp) {
+      return res.status(400).json({ success: false, error: 'Invalid OTP code. Please check your email.' });
+    }
 
-    if (!authUser) {
+    if (new Date(storedData.expires_at) < new Date()) {
+      await supabaseAdmin.from('otp_codes').delete().eq('email', cleanEmail);
+      return res.status(400).json({ success: false, error: 'OTP code has expired. Please request a new one.' });
+    }
+
+    // Find user in Supabase Auth via profiles table (avoid expensive listUsers)
+    const { data: profileData } = await supabaseAdmin
+      .from('profiles')
+      .select('id')
+      .eq('primary_email', cleanEmail)
+      .single();
+
+    if (!profileData) {
       return res.status(404).json({ success: false, error: 'No account found with this email.' });
     }
 
-    // Force update the password in Supabase Auth
-    const { error: updateErr } = await supabaseAdmin.auth.admin.updateUserById(authUser.id, {
+    // Force update password in Supabase Auth
+    const { error: updateErr } = await supabaseAdmin.auth.admin.updateUserById(profileData.id, {
       password: newPassword
     });
 
@@ -857,8 +887,10 @@ app.post('/api/auth/verify-reset-password', async (req, res) => {
       return res.status(400).json({ success: false, error: updateErr.message });
     }
 
-    forgotOtpStore.delete(cleanEmail);
+    // Clean up used OTP from Supabase
+    await supabaseAdmin.from('otp_codes').delete().eq('email', cleanEmail);
 
+    console.log(`✅ Password successfully reset for ${cleanEmail}`);
     res.json({ success: true, message: 'Password has been reset successfully!' });
   } catch (err) {
     console.error('Verify reset error:', err);
@@ -882,6 +914,11 @@ app.get('/api/ping', async (req, res) => {
 
 app.get('/', (req, res) => {
   res.send('PolyCollab Backend is running 🚀');
+});
+
+// 404 catch-all — must be registered AFTER all routes
+app.use((req, res) => {
+  res.status(404).json({ success: false, error: `Route not found: ${req.method} ${req.path}` });
 });
 
 if (process.env.NODE_ENV !== 'production') {
