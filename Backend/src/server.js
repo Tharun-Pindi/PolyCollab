@@ -792,6 +792,7 @@ app.patch('/api/applications/:id', async (req, res) => {
 
       const emailResult = await sendApplicationAcceptedEmail({
         applicantName: app.applicant?.full_name,
+        applicantEmail: app.applicant?.primary_email,
         projectTitle: app.project?.title || 'the project',
         roleApplied: app.role_applied,
         ownerName: ownerProfile?.full_name || 'the project lead'
